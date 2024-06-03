@@ -80,7 +80,7 @@
             const prompt = document.getElementById('prompt').value;
             const document_url = document.getElementById('document_url').value;
 
-            const response = await fetch('/query', {
+            const response = await fetch('/process-question', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
