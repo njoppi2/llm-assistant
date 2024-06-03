@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Interaction</title>
+</head>
+
+<body>
+    <h1>Interact with API</h1>
+    <form id="query-form">
+        <label for="question">Question:</label>
+        <input type="text" id="question" name="question" required><br><br>
+        <label for="document_url">Document URL:</label>
+        <input type="url" id="document_url" name="document_url" required><br><br>
+        <button type="submit">Send</button>
+    </form>
+    <pre id="response"></pre>
+
+    <script>
+        document.getElementById('query-form').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const question = document.getElementById('question').value;
+            const document_url = document.getElementById('document_url').value;
+
+            const response = await fetch('/query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question, document_url }),
+            });
+
+            const result = await response.json();
+            document.getElementById('response').innerText = JSON.stringify(result, null, 2);
+        });
+    </script>
+</body>
+
+</html>
