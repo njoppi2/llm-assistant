@@ -8,6 +8,8 @@ fastapi = "*"
 uvicorn = "*"
 httpx = "*"
 langchain = "*"
+pypdf4 = "*"
+pdfplumber = "*"
 
 [dev-packages]
 

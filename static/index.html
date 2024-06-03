@@ -68,7 +68,9 @@
             value="Você sempre deve considerar o {context} para responder. Questão: {question} Avalie a resposta fornecida em um objeto JSON com a propriedade 'saida' cujos possíveis valores são 'sim' ou 'não', e uma outra propriedade com a justificativa. Esse valor dependerá exclusivamente da resposta da pergunta."
             required><br>
         <label for="document_url">Document URL:</label>
-        <input type="url" id="document_url" name="document_url" required><br>
+        <input type="url" id="document_url" name="document_url"
+            value="https://api.virtual.tce.sc.gov.br/esfingeweb/rest/publico/getArquivoOnline?identificadorGed=ZmE1YzU3OGQtNDgwMy00Y2Q4LWFjYTMtNTg1OGY4Y2ZkOGJk"
+            required><br>
         <button type="submit">Send</button>
     </form>
     <pre id="response"></pre>
