@@ -6,19 +6,10 @@ def similar(table, miner):
     return SequenceMatcher(None, table, miner).ratio()
 
 def process_headers_footers(sorted_units, headers_footers, doc, type_to_process):
-    for counter_in_loop_hf in range(len(sorted_units)):
-        units_with_same_index = []
-        for el in sorted_units:
-            try:
-                units_with_same_index.append(el[counter_in_loop_hf])
-            except IndexError:
-                continue
-        for unitt in units_with_same_index:
-            similar_counter = 0
-            for rest in units_with_same_index:
-                if similar(unitt['para'], rest['para']) > 0.8:
-                    similar_counter += 1
-            if similar_counter > (len(doc) - 5):
+    for unit_tuple in zip(*sorted_units):
+        for unitt in unit_tuple:
+            similar_counter = sum(1 for rest in unit_tuple if similar(unitt['para'], rest['para']) > 0.8)
+            if similar_counter > (len(sorted_units) - 5):
                 a = " ".join(unitt['para'].split())
                 for el in headers_footers:
                     if el['page'] == unitt['page']:
@@ -27,7 +18,6 @@ def process_headers_footers(sorted_units, headers_footers, doc, type_to_process)
 def get_content_without_headers_and_footers(path):
     # Open the PDF file
     doc = fitz.open(path)
-    headers_footers = []
     sorted_footer_units = []
     sorted_header_units = []
     
@@ -52,28 +42,12 @@ def get_content_without_headers_and_footers(path):
         
         if not units:
             continue
+        
         most_bottom_unit = sorted(units, key=lambda d: d['y0'], reverse=False)
         footer_area_units = []
         header_area_units = []
 
-        # Identify headers and footers
-        headers = [most_bottom_unit[-1]]
-        footers = [most_bottom_unit[0]]
         for el in most_bottom_unit:
-            smallest = most_bottom_unit[0]['y0']
-            largest = most_bottom_unit[-1]['y0']
-            if (el['y0'] - smallest) >= 0 and (int(el['y0']) - int(smallest)) < 3:
-                if el['para'] != most_bottom_unit[0]['para']:
-                    footers.append(el)
-                    continue
-                else:
-                    continue
-            if (largest - float(el['y0'])) >= 0 and (largest - float(el['y0'])) < 3:
-                if el['para'] != most_bottom_unit[-1]['para']:
-                    headers.append(el)
-                    continue
-                else:
-                    continue
             if int(el['y0']) - p_height / 2 >= 0:
                 header_area_units.append(el)
             if int(el['y0']) - p_height / 2 < 0:
@@ -82,27 +56,24 @@ def get_content_without_headers_and_footers(path):
         header_area_units = sorted(header_area_units, key=lambda d: d['y0'], reverse=True)
         sorted_footer_units.append(footer_area_units)
         sorted_header_units.append(header_area_units)
-        headers = sorted(headers, key=lambda d: d['x0'], reverse=False)
-        headers = [el['para'] for el in headers]
-        footers = sorted(footers, key=lambda d: d['x0'], reverse=False)
-        footers = [el['para'] for el in footers]
-        headers_footers.append({'page': page_nr + 1, 'header': headers, 'footer': footers})
 
-    footers = []
-    headers = []
+    headers_footers = [{'page': i + 1, 'header': [], 'footer': []} for i in range(len(doc))]
 
     process_headers_footers(sorted_header_units, headers_footers, doc, 'header')
     process_headers_footers(sorted_footer_units, headers_footers, doc, 'footer')
 
+    footers = []
+    headers = []
+
     for el in headers_footers:
         counter_f = 0
         counter_h = 0
-        for rest in headers_footers:
-            if similar(el['footer'], rest['footer']) > 0.7:
-                counter_f += 1
-        for rest in headers_footers:
-            if similar(el['header'], rest['header']) > 0.7:
-                counter_h += 1
+        if el['footer'] and el['header']:  # Check if the lists are not empty
+            for rest in headers_footers:
+                if rest['footer'] and similar(el['footer'], rest['footer']) > 0.7:  # Check if the list is not empty
+                    counter_f += 1
+                if rest['header'] and similar(el['header'], rest['header']) > 0.7:  # Check if the list is not empty
+                    counter_h += 1
         if counter_f >= len(headers_footers) - 3:
             footers.append({'page': el['page'], 'footers': el['footer']})
         if counter_h >= len(headers_footers) - 3:
@@ -125,16 +96,14 @@ def get_content_without_headers_and_footers(path):
                             is_header_or_footer = False
                             for hf in headers_footers:
                                 if hf['page'] == page_nr + 1:
-                                    for hf in headers_footers:
-                                        if hf['page'] == page_nr + 1:
-                                            for header in hf['header']:
-                                                if similar(paragraph, header) > 0.8:
-                                                    is_header_or_footer = True
-                                                    break
-                                            for footer in hf['footer']:
-                                                if similar(paragraph, footer) > 0.8:
-                                                    is_header_or_footer = True
-                                                    break
+                                    for header in hf['header']:
+                                        if similar(paragraph, header) > 0.8:
+                                            is_header_or_footer = True
+                                            break
+                                    for footer in hf['footer']:
+                                        if similar(paragraph, footer) > 0.8:
+                                            is_header_or_footer = True
+                                            break
                             if not is_header_or_footer:
                                 line_content.append(paragraph)
                     if len(line_content) >= 0:
@@ -145,8 +114,8 @@ def get_content_without_headers_and_footers(path):
     return content_without_headers_and_footers
 
 # Usage example
-path_to_pdf = 'edital.pdf'
-output_file_name = path_to_pdf + '8.txt'
+path_to_pdf = 'edital2.pdf'
+output_file_name = path_to_pdf + '12.txt'
 content = get_content_without_headers_and_footers(path_to_pdf)
 
 if os.path.exists(output_file_name):
