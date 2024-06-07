@@ -2,10 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Run Uvicorn with Pipenv",
+            "name": "Python: Run Uvicorn",
             "type": "python",
             "request": "launch",
-            "program": "/home/njoppi2/.local/bin/uvicorn",
+            // "program": "/home/njoppi2/.local/bin/uvicorn",
+            "program": "${workspaceFolder}/env/Scripts/uvicorn.exe",
             "args": [
                 "main:app",
                 "--host",
@@ -16,6 +17,17 @@
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"
-        }
+        }, 
+        // { NAO é necessário. é só debugar na opção Python Debugger: Python File
+        //     "name": "Python: run remove_header_and_footer.py",
+        //     "type": "python",
+        //     "request": "launch",
+        //     "program": "${workspaceFolder}/env/Scripts/python.exe",
+        //     "args": [
+        //         "remove_header_and_footer.py"
+        //     ],
+        //     "console": "integratedTerminal",
+        //     "cwd": "${workspaceFolder}"
+        // }
     ]
 }
