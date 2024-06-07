@@ -39,9 +39,9 @@ def process_headers_footers(sorted_units, headers_footers, type_to_process):
             for concatenated_page_units_from_0_to_n_2 in concatenated_page_units_from_0_to_n_per_page:
                 similarity = similar(concatenated_page_units_from_0_to_n['para'], concatenated_page_units_from_0_to_n_2['para'])
                 concatenated_page_units_from_0_to_n['similarity_sum'] = concatenated_page_units_from_0_to_n.get('similarity_sum', 0) + similarity
-                concatenated_page_units_from_0_to_n['similarity_count'] = concatenated_page_units_from_0_to_n.get('similarity_count', 0) + 1
+                concatenated_page_units_from_0_to_n['count'] = concatenated_page_units_from_0_to_n.get('count', 0) + 1
 
-            if concatenated_page_units_from_0_to_n['similarity_sum'] / concatenated_page_units_from_0_to_n['similarity_count'] > 0.95:
+            if concatenated_page_units_from_0_to_n['similarity_sum'] / concatenated_page_units_from_0_to_n['count'] > 0.95:
                 similar_strings.append(concatenated_page_units_from_0_to_n)
 
         doc_length = len(sorted_units)
@@ -156,19 +156,20 @@ def get_content_without_headers_and_footers(path):
 
     return organized_content
 
-# Usage example
-path_to_pdf = 'edital.pdf'
-output_file_name = path_to_pdf + '12.txt'
-content = get_content_without_headers_and_footers(path_to_pdf)
+for i in range(1, 26):
+    print(f"starting {i}")
+    path_to_pdf = f'edital{i}.pdf'
+    output_file_name = path_to_pdf + '.txt'
+    content = get_content_without_headers_and_footers(path_to_pdf)
 
-if os.path.exists(output_file_name):
-    # Delete the existing file
-    os.remove(output_file_name)
+    if os.path.exists(output_file_name):
+        # Delete the existing file
+        os.remove(output_file_name)
 
-with open(output_file_name, "a", encoding="utf-8") as file:
-    # Loop through the data and append each item to the file
-    for item_array in content:
-        # Concatenate the elements in the sub-array with a space
-        for item in item_array['content']:
-            # Append the combined string to the file
-            file.write(item + '\n')
+    with open(output_file_name, "a", encoding="utf-8") as file:
+        # Loop through the data and append each item to the file
+        for item_array in content:
+            # Concatenate the elements in the sub-array with a space
+            for item in item_array['content']:
+                # Append the combined string to the file
+                file.write(item + '\n')
