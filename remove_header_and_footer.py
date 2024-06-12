@@ -81,13 +81,14 @@ def get_content_without_headers_and_footers(path):
                 for line_num in range(len(block["lines"])):
                     line = block["lines"][line_num]
                     line_content = []
-                    for span in line["spans"]:
-                        paragraph = span["text"]
+                    for first_span in line["spans"]:
+                        paragraph = first_span["text"]
                         if not paragraph.isspace():
                             line_content.append(paragraph)
                     if len(line_content) >= 0:
-                        span = line['spans'][0]
-                        page_units.append({'page': page_nr + 1, 'index': unit_count, 'para': " ".join(line_content), 'x0': span["bbox"][0], 'y0': span["bbox"][1]})
+                        first_span = line['spans'][0]
+                        last_span = line['spans'][-1]
+                        page_units.append({'page': page_nr + 1, 'index': unit_count, 'para': " ".join(line_content), 'x0': first_span["bbox"][0], 'y0': first_span["bbox"][1], 'x1': last_span["bbox"][2], 'y1': last_span["bbox"][3]})
                         unit_count += 1
         if not page_units:
             continue
@@ -121,10 +122,27 @@ def get_content_without_headers_and_footers(path):
         units_in_page_n = [u for u in units if u.get('page') == page_nr]
         content_without_headers_and_footers.extend([u for u in units_in_page_n if u.get('index') not in header_footer_indexes])
 
-    # Organize the content back into pages
+    # Organize the content into paragraphs
     organized_content = []
     for page_nr in range(1, doc_length + 1):
-        page_content = [unit['para'] for unit in content_without_headers_and_footers if unit['page'] == page_nr]
+        page_content = []
+        paragraph = []
+        for unit in content_without_headers_and_footers:
+            if unit.get('page') != page_nr:
+                continue
+            unit_text = unit['para']
+            if unit['x1'] > 555:
+                # middle of paragraph
+                paragraph.append(unit_text)
+            else:
+                # paragraph end
+                paragraph.append(unit_text)
+                page_content.append("".join(paragraph))
+                paragraph = []
+
+                
+
+
         if page_content:
             organized_content.append({'page': page_nr, 'content': page_content})
 
