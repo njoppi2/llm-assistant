@@ -124,28 +124,30 @@ def get_content_without_headers_and_footers(path):
 
     # Organize the content into paragraphs
     organized_content = []
+    paragraph = []
     for page_nr in range(1, doc_length + 1):
-        page_content = []
-        paragraph = []
-        for unit in content_without_headers_and_footers:
-            if unit.get('page') != page_nr:
+        for unit_index, unit in enumerate(content_without_headers_and_footers):
+            if unit.get('page') > page_nr:
+                break
+            elif unit.get('page') < page_nr:
                 continue
-            unit_text = unit['para']
-            if unit['x1'] > 555:
-                # middle of paragraph
-                paragraph.append(unit_text)
-            else:
-                # paragraph end
-                paragraph.append(unit_text)
-                page_content.append("".join(paragraph))
+            
+            previous_unit = content_without_headers_and_footers[unit_index - 1]
+            smallest_y = min(previous_unit['y0'], unit['y0'])
+            biggest_y = max(previous_unit['y1'], unit['y1'])
+            previout_unit_height = previous_unit['y1'] - previous_unit['y0']
+            unit_height = unit['y1'] - unit['y0']
+
+            is_in_same_line = (biggest_y - smallest_y) < 1.5 * previout_unit_height and (biggest_y - smallest_y) < 1.5 * unit_height
+            
+            if previous_unit['x1'] < 555 and not is_in_same_line:
+                organized_content.append("".join(paragraph))
                 paragraph = []
+            unit_text = unit['para']
+            paragraph.append(unit_text)
 
-                
-
-
-        if page_content:
-            organized_content.append({'page': page_nr, 'content': page_content})
-
+    if paragraph:
+        organized_content.append("".join(paragraph))
     return organized_content
 
 for i in range(1, 2):
@@ -160,8 +162,6 @@ for i in range(1, 2):
 
     with open(output_file_name, "a", encoding="utf-8") as file:
         # Loop through the data and append each item to the file
-        for item_array in content:
-            # Concatenate the elements in the sub-array with a space
-            for item in item_array['content']:
-                # Append the combined string to the file
-                file.write(item + '\n')
+        for item in content:
+            # Append the combined string to the file
+            file.write(item + '\n')
