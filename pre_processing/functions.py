@@ -124,36 +124,39 @@ def group_units_in_lines(pages_without_headers_and_footers, doc_length):
 
     return pages_organized_by_lines
 
+def is_current_and_previous_lines_in_same_paragraph(current_line, previous_line, right_aligment_dict):
+    lower_bound = right_aligment_dict['lower_bound']
+    upper_bound = right_aligment_dict['upper_bound']
+    minimum_x_coord_considered_line_end = lower_bound
+
+    is_previous_line_in_line_end = previous_line[-1]['x1'] > minimum_x_coord_considered_line_end
+    is_previous_line_aligned_or_before_current = previous_line[0]['x0'] <= current_line[0]['x0']
+    is_same_paragraph = is_previous_line_in_line_end and is_previous_line_aligned_or_before_current
+
+
 def group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, doc_length):
     all_paragraphs = []
     paragraph = []
 
-    lower_bound = right_aligment_dict['lower_bound']
-    upper_bound = right_aligment_dict['upper_bound']
-
-
-    minimum_x_coord_considered_line_end = lower_bound
     for page_nr in range(1, doc_length + 1):
-        for line_index, line_units in enumerate(pages_organized_by_lines):
-            first_unit = line_units[0]
-            last_unit = line_units[-1]
+        for line_index, current_line in enumerate(pages_organized_by_lines):
+            first_unit = current_line[0]
+            last_unit = current_line[-1]
             if first_unit.get('page') > page_nr:
                 break
             elif first_unit.get('page') < page_nr:
                 continue
             elif line_index == 0:
-                paragraph.append(line_units)
+                paragraph.append(current_line)
                 continue
 
             previous_line = pages_organized_by_lines[line_index - 1]
-            is_previous_line_in_line_end = previous_line[-1]['x1'] > minimum_x_coord_considered_line_end
-            is_previous_line_aligned_or_before_current = previous_line[0]['x0'] <= line_units[0]['x0']
-            is_same_paragraph = is_previous_line_in_line_end and is_previous_line_aligned_or_before_current
-            if not is_same_paragraph:
+            paragraph_continuation = is_current_and_previous_lines_in_same_paragraph(current_line, previous_line, right_aligment_dict)
+            if not paragraph_continuation:
                 # assert line[0]['page'] == line[-1]['page']
                 all_paragraphs.append(paragraph)
                 paragraph = []
-            paragraph.append(line_units)
+            paragraph.append(current_line)
     if paragraph:
         all_paragraphs.append(paragraph)
     return all_paragraphs

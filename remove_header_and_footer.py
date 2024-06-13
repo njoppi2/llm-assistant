@@ -144,6 +144,7 @@ def get_content_without_headers_and_footers(path):
     pages_organized_by_lines = group_units_in_lines(pages_without_headers_and_footers, doc_length)
     right_aligment_dict = calculate_right_aligment(pages_organized_by_lines, target_percentage)
     all_paragraphs = group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, doc_length)
+    
     return all_paragraphs
 
 for i in range(1, 2):
