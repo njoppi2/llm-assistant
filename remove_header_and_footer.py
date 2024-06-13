@@ -2,7 +2,7 @@ import os
 import fitz  # PyMuPDF
 from difflib import SequenceMatcher
 import re
-from .calculate_right_aligment import calculate_right_aligment
+from pre_processing.functions import calculate_right_aligment
 
 # Target percentage of data
 target_percentage = 0.4
@@ -211,8 +211,8 @@ def get_content_without_headers_and_footers(path):
 
 for i in range(1, 2):
     print(f"starting {i}")
-    path_to_pdf = f'edital{i}.pdf'
-    output_file_name = path_to_pdf + '_preprocessed'+str(target_percentage)+'.txt'
+    path_to_pdf = f'pdfs/edital{i}.pdf'
+    output_file_name = f'pdfs/edital{i}_preprocessed{str(target_percentage)}.txt'
     content = get_content_without_headers_and_footers(path_to_pdf)
 
     if os.path.exists(output_file_name):

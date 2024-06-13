@@ -3,7 +3,7 @@ from scipy.stats import gaussian_kde
 import math
 import matplotlib.pyplot as plt
 
-def calculate(pages_organized_by_lines, target_percentage):
+def calculate_right_aligment(pages_organized_by_lines, target_percentage):
     # Replace this with your actual data
     all_line_ends_x_coord = [line_unit[-1]['x1'] for line_unit in pages_organized_by_lines]
 
