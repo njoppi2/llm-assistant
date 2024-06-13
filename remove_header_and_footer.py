@@ -2,7 +2,7 @@ import os
 import fitz  # PyMuPDF
 from difflib import SequenceMatcher
 import re
-from pre_processing.functions import calculate_right_aligment
+from pre_processing.functions import calculate_right_aligment, group_lines_into_paragraphs, group_units_in_lines
 
 # Target percentage of data
 target_percentage = 0.4
@@ -141,72 +141,9 @@ def get_content_without_headers_and_footers(path):
         units_in_page_n = [u for u in units if u.get('page') == page_nr]
         pages_without_headers_and_footers.extend([u for u in units_in_page_n if u.get('index') not in header_footer_indexes])
 
-    # Organize the content into paragraphs
-    pages_organized_by_lines = []
-    line = []
-
-    for page_nr in range(1, doc_length + 1):
-        for unit_index, unit in enumerate(pages_without_headers_and_footers):
-            if unit.get('page') > page_nr:
-                break
-            elif unit.get('page') < page_nr:
-                continue
-            elif unit_index == 0:
-                line.append(unit)
-                continue
-            
-            previous_unit = pages_without_headers_and_footers[unit_index - 1]
-            smallest_y = min(previous_unit['y0'], unit['y0'])
-            biggest_y = max(previous_unit['y1'], unit['y1'])
-            previout_unit_height = previous_unit['y1'] - previous_unit['y0']
-            unit_height = unit['y1'] - unit['y0']
-
-            is_in_same_line = (biggest_y - smallest_y) < 1.5 * previout_unit_height and (biggest_y - smallest_y) < 1.5 * unit_height
-            
-            if not is_in_same_line:
-                assert line[0]['page'] == line[-1]['page']
-                pages_organized_by_lines.append(line)
-                line = []
-            line.append(unit)
-    if line:
-        pages_organized_by_lines.append(line)
-
-    # Replace this with your actual data
-    all_line_ends_x_coord = [line_unit[-1]['x1'] for line_unit in pages_organized_by_lines]
-
-
-    all_paragraphs = []
-    paragraph = []
-
-
+    pages_organized_by_lines = group_units_in_lines(pages_without_headers_and_footers, doc_length)
     right_aligment_dict = calculate_right_aligment(pages_organized_by_lines, target_percentage)
-    lower_bound = right_aligment_dict['lower_bound']
-    upper_bound = right_aligment_dict['upper_bound']
-
-    minimum_x_coord_considered_line_end = lower_bound
-    for page_nr in range(1, doc_length + 1):
-        for line_index, line_units in enumerate(pages_organized_by_lines):
-            first_unit = line_units[0]
-            last_unit = line_units[-1]
-            if first_unit.get('page') > page_nr:
-                break
-            elif first_unit.get('page') < page_nr:
-                continue
-            elif line_index == 0:
-                paragraph.append(line_units)
-                continue
-
-            previous_line = pages_organized_by_lines[line_index - 1]
-            is_previous_line_in_line_end = previous_line[-1]['x1'] > minimum_x_coord_considered_line_end
-            is_previous_line_aligned_or_before_current = previous_line[0]['x0'] <= line_units[0]['x0']
-            is_same_paragraph = is_previous_line_in_line_end and is_previous_line_aligned_or_before_current
-            if not is_same_paragraph:
-                # assert line[0]['page'] == line[-1]['page']
-                all_paragraphs.append(paragraph)
-                paragraph = []
-            paragraph.append(line_units)
-    if paragraph:
-        all_paragraphs.append(paragraph)
+    all_paragraphs = group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, doc_length)
     return all_paragraphs
 
 for i in range(1, 2):
