@@ -2,6 +2,10 @@ import os
 import fitz  # PyMuPDF
 from difflib import SequenceMatcher
 import re
+from .calculate_right_aligment import calculate_right_aligment
+
+# Target percentage of data
+target_percentage = 0.4
 
 def similar(a, b):
     return SequenceMatcher(None, replace_numbers_with_zero(a), replace_numbers_with_zero(b)).ratio()
@@ -88,7 +92,22 @@ def get_content_without_headers_and_footers(path):
                     if len(line_content) >= 0:
                         first_span = line['spans'][0]
                         last_span = line['spans'][-1]
-                        page_units.append({'page': page_nr + 1, 'index': unit_count, 'para': " ".join(line_content), 'x0': first_span["bbox"][0], 'y0': first_span["bbox"][1], 'x1': last_span["bbox"][2], 'y1': last_span["bbox"][3]})
+                        page_units.append(
+                            {
+                                'page': page_nr + 1,
+                                'index': unit_count,
+                                'para': " ".join(line_content),
+                                'x0': first_span["bbox"][0],
+                                'y0': first_span["bbox"][1],
+                                'x1': last_span["bbox"][2],
+                                'y1': last_span["bbox"][3],
+                                'origin_x0': first_span['origin'][0],
+                                'origin_y0': first_span['origin'][1],
+                                'flags': first_span['flags'],
+                                'size': first_span['size'],
+                                'color': first_span['color']
+                            }
+                        )
                         unit_count += 1
         if not page_units:
             continue
@@ -112,7 +131,7 @@ def get_content_without_headers_and_footers(path):
     headers = process_headers_footers(sorted_header_units)
 
     # Remove headers and footers from units
-    content_without_headers_and_footers = [] # SHOULD SIMPLY BE A NOT IN HEADERS_FOOTERS PER PAGE
+    pages_without_headers_and_footers = [] # SHOULD SIMPLY BE A NOT IN HEADERS_FOOTERS PER PAGE
     # just compare what units is to what headers_footers is
     for page_index in range(doc_length):
         page_nr = page_index + 1
@@ -120,19 +139,23 @@ def get_content_without_headers_and_footers(path):
         footer_indexes_flattened = [index for d in footers if d.get('page') == page_nr for index in d['header_footer_indexes']]
         header_footer_indexes = [*header_indexes_flattened, *footer_indexes_flattened]
         units_in_page_n = [u for u in units if u.get('page') == page_nr]
-        content_without_headers_and_footers.extend([u for u in units_in_page_n if u.get('index') not in header_footer_indexes])
+        pages_without_headers_and_footers.extend([u for u in units_in_page_n if u.get('index') not in header_footer_indexes])
 
     # Organize the content into paragraphs
-    organized_content = []
-    paragraph = []
+    pages_organized_by_lines = []
+    line = []
+
     for page_nr in range(1, doc_length + 1):
-        for unit_index, unit in enumerate(content_without_headers_and_footers):
+        for unit_index, unit in enumerate(pages_without_headers_and_footers):
             if unit.get('page') > page_nr:
                 break
             elif unit.get('page') < page_nr:
                 continue
+            elif unit_index == 0:
+                line.append(unit)
+                continue
             
-            previous_unit = content_without_headers_and_footers[unit_index - 1]
+            previous_unit = pages_without_headers_and_footers[unit_index - 1]
             smallest_y = min(previous_unit['y0'], unit['y0'])
             biggest_y = max(previous_unit['y1'], unit['y1'])
             previout_unit_height = previous_unit['y1'] - previous_unit['y0']
@@ -140,20 +163,56 @@ def get_content_without_headers_and_footers(path):
 
             is_in_same_line = (biggest_y - smallest_y) < 1.5 * previout_unit_height and (biggest_y - smallest_y) < 1.5 * unit_height
             
-            if previous_unit['x1'] < 555 and not is_in_same_line:
-                organized_content.append("".join(paragraph))
-                paragraph = []
-            unit_text = unit['para']
-            paragraph.append(unit_text)
+            if not is_in_same_line:
+                assert line[0]['page'] == line[-1]['page']
+                pages_organized_by_lines.append(line)
+                line = []
+            line.append(unit)
+    if line:
+        pages_organized_by_lines.append(line)
 
+    # Replace this with your actual data
+    all_line_ends_x_coord = [line_unit[-1]['x1'] for line_unit in pages_organized_by_lines]
+
+
+    all_paragraphs = []
+    paragraph = []
+
+
+    right_aligment_dict = calculate_right_aligment(pages_organized_by_lines, target_percentage)
+    lower_bound = right_aligment_dict['lower_bound']
+    upper_bound = right_aligment_dict['upper_bound']
+
+    minimum_x_coord_considered_line_end = lower_bound
+    for page_nr in range(1, doc_length + 1):
+        for line_index, line_units in enumerate(pages_organized_by_lines):
+            first_unit = line_units[0]
+            last_unit = line_units[-1]
+            if first_unit.get('page') > page_nr:
+                break
+            elif first_unit.get('page') < page_nr:
+                continue
+            elif line_index == 0:
+                paragraph.append(line_units)
+                continue
+
+            previous_line = pages_organized_by_lines[line_index - 1]
+            is_previous_line_in_line_end = previous_line[-1]['x1'] > minimum_x_coord_considered_line_end
+            is_previous_line_aligned_or_before_current = previous_line[0]['x0'] <= line_units[0]['x0']
+            is_same_paragraph = is_previous_line_in_line_end and is_previous_line_aligned_or_before_current
+            if not is_same_paragraph:
+                # assert line[0]['page'] == line[-1]['page']
+                all_paragraphs.append(paragraph)
+                paragraph = []
+            paragraph.append(line_units)
     if paragraph:
-        organized_content.append("".join(paragraph))
-    return organized_content
+        all_paragraphs.append(paragraph)
+    return all_paragraphs
 
 for i in range(1, 2):
     print(f"starting {i}")
     path_to_pdf = f'edital{i}.pdf'
-    output_file_name = path_to_pdf + '_preprocessed2.txt'
+    output_file_name = path_to_pdf + '_preprocessed'+str(target_percentage)+'.txt'
     content = get_content_without_headers_and_footers(path_to_pdf)
 
     if os.path.exists(output_file_name):
@@ -162,6 +221,10 @@ for i in range(1, 2):
 
     with open(output_file_name, "a", encoding="utf-8") as file:
         # Loop through the data and append each item to the file
-        for item in content:
-            # Append the combined string to the file
-            file.write(item + '\n')
+        for paragraph in content:
+            for line in paragraph:
+                for unit in line:
+                    # Append the combined string to the file
+                    file.write(unit['para'])
+            # Only break lines after a paragraph ending
+            file.write('\n')
