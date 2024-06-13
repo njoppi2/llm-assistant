@@ -104,6 +104,7 @@ def get_content_without_headers_and_footers(path):
                                 'origin_x0': first_span['origin'][0],
                                 'origin_y0': first_span['origin'][1],
                                 'flags': first_span['flags'],
+                                'bold': first_span['flags'] & 2**4,
                                 'size': first_span['size'],
                                 'color': first_span['color']
                             }
@@ -144,10 +145,10 @@ def get_content_without_headers_and_footers(path):
     pages_organized_by_lines = group_units_in_lines(pages_without_headers_and_footers, doc_length)
     right_aligment_dict = calculate_right_aligment(pages_organized_by_lines, target_percentage)
     all_paragraphs = group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, doc_length)
-    
+
     return all_paragraphs
 
-for i in range(1, 2):
+for i in range(2, 26):
     print(f"starting {i}")
     path_to_pdf = f'pdfs/edital{i}.pdf'
     output_file_name = f'pdfs/edital{i}_preprocessed{str(target_percentage)}.txt'

@@ -124,14 +124,55 @@ def group_units_in_lines(pages_without_headers_and_footers, doc_length):
 
     return pages_organized_by_lines
 
-def is_current_and_previous_lines_in_same_paragraph(current_line, previous_line, right_aligment_dict):
+def ends_with_punctuation(s):
+    # Remove trailing spaces
+    stripped_string = s.rstrip()
+    return stripped_string.endswith(';') or stripped_string.endswith('.') or stripped_string.endswith(':')
+
+def vertical_distance_diff(curr_line, prev_line, prev2_line):
+    """
+    Calculates how the vertical distance between the current and previous line compares to another vertical distance.
+    Positive values indicates higher probability of curr and prev being in the same paragraph
+    """
+    if curr_line[0]['page'] != prev_line[0]['page'] or prev_line[0]['page'] != prev2_line[0]['page']:
+        return 0
+    
+    curr_prev_distance = curr_line[0]['origin_y0'] - prev_line[0]['origin_y0']
+    prev_prev2_distance = prev_line[0]['origin_y0'] - prev2_line[0]['origin_y0']
+    distance_difference = prev_prev2_distance - curr_prev_distance
+
+    return distance_difference
+    
+def is_current_and_previous_lines_in_same_paragraph(curr_line, prev_line, prev2_line, right_aligment_dict):
+    """
+        Positive values indicates higher probability of curr and prev being in the same paragraph
+    """
     lower_bound = right_aligment_dict['lower_bound']
     upper_bound = right_aligment_dict['upper_bound']
-    minimum_x_coord_considered_line_end = lower_bound
+    variance = right_aligment_dict['variance']
+    range_with_mid_paragraph_lines = upper_bound - lower_bound
+    prev_distance_to_upper_bound = upper_bound - prev_line[-1]['x1']
 
-    is_previous_line_in_line_end = previous_line[-1]['x1'] > minimum_x_coord_considered_line_end
-    is_previous_line_aligned_or_before_current = previous_line[0]['x0'] <= current_line[0]['x0']
-    is_same_paragraph = is_previous_line_in_line_end and is_previous_line_aligned_or_before_current
+    # We multiply by variance because the more concentrated (smaller variance) line endings are to a specific point,
+    # the higher the chance of the text being justify, so the distance from the upper_bound matters more
+    is_prev_and_curr_perfectly_aligned = prev_line[0]['x0'] == curr_line[0]['x0']
+    # is_prev_and_curr_partially_aligned = any([prev_unit['x0'] == curr_line[0]['x0'] for prev_unit in prev_line])
+    did_prev_end_with_final_puctuation = ends_with_punctuation(prev_line[-1]['para'])
+    is_font_size_equal = prev_line[0]['size'] == curr_line[0]['size']
+    is_bold_state_equal = prev_line[0]['bold'] == curr_line[0]['bold']
+    are_colors_equal = prev_line[0]['color'] == curr_line[0]['color']
+    are_flags_equal = prev_line[0]['flags'] == curr_line[0]['flags']
+    horizontal_distance = curr_line[0]['x0'] - prev_line[0]['x0']
+    horizontal_distance_cost = 5 if horizontal_distance == 0 else min(horizontal_distance, 0) * (200 / upper_bound)
+    # these 2 should only get the value related to curr-prev, and then compare it to the average values of the document, not to only 1 other value
+    vertical_distance_cost = vertical_distance_diff(curr_line, prev_line, prev2_line)
+    # prev_number_of_characters = sum(len(unit['para']) for unit in prev_line)
+
+    prev_distance_to_upper_bound_cost = - (prev_distance_to_upper_bound - range_with_mid_paragraph_lines) / (range_with_mid_paragraph_lines * variance)
+    prev_punctuation_cost = -5 if did_prev_end_with_final_puctuation else 5
+
+    is_same_paragraph = (prev_distance_to_upper_bound_cost + prev_punctuation_cost + horizontal_distance_cost + vertical_distance_cost) > 0
+    return is_same_paragraph
 
 
 def group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, doc_length):
@@ -151,7 +192,8 @@ def group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, d
                 continue
 
             previous_line = pages_organized_by_lines[line_index - 1]
-            paragraph_continuation = is_current_and_previous_lines_in_same_paragraph(current_line, previous_line, right_aligment_dict)
+            second_previous_line = pages_organized_by_lines[max(line_index - 2, 0)]
+            paragraph_continuation = is_current_and_previous_lines_in_same_paragraph(current_line, previous_line, second_previous_line, right_aligment_dict)
             if not paragraph_continuation:
                 # assert line[0]['page'] == line[-1]['page']
                 all_paragraphs.append(paragraph)
@@ -159,4 +201,5 @@ def group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, d
             paragraph.append(current_line)
     if paragraph:
         all_paragraphs.append(paragraph)
+
     return all_paragraphs
