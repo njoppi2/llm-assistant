@@ -168,19 +168,19 @@ def ends_with_punctuation(s):
     stripped_string = s.rstrip()
     return stripped_string.endswith(';') or stripped_string.endswith('.') or stripped_string.endswith(':')
 
-def vertical_distance_diff(curr_line, prev_line, prev2_line):
-    """
-    Calculates how the vertical distance between the current and previous line compares to another vertical distance.
-    Positive values indicates higher probability of curr and prev being in the same paragraph
-    """
-    if curr_line[0]['page'] != prev_line[0]['page'] or prev_line[0]['page'] != prev2_line[0]['page']:
-        return 0
+# def vertical_distance_diff(curr_line, prev_line, prev2_line):
+#     """
+#     Calculates how the vertical distance between the current and previous line compares to another vertical distance.
+#     Positive values indicates higher probability of curr and prev being in the same paragraph
+#     """
+#     if curr_line[0]['page'] != prev_line[0]['page'] or prev_line[0]['page'] != prev2_line[0]['page']:
+#         return 0
     
-    curr_prev_distance = curr_line[0]['origin_y0'] - prev_line[0]['origin_y0']
-    prev_prev2_distance = prev_line[0]['origin_y0'] - prev2_line[0]['origin_y0']
-    distance_difference = prev_prev2_distance - curr_prev_distance
+#     curr_prev_distance = curr_line[0]['origin_y0'] - prev_line[0]['origin_y0']
+#     prev_prev2_distance = prev_line[0]['origin_y0'] - prev2_line[0]['origin_y0']
+#     distance_difference = prev_prev2_distance - curr_prev_distance
 
-    return distance_difference
+#     return distance_difference
 
 def is_roman_number(num):
     pattern = re.compile(r"""   
@@ -218,30 +218,30 @@ def calculate_item_cost(s):
     else:
         return - item_level * 2
 
-def calculate_right_aligment_cost(curr_line, prev_line, right_aligment_dict):
-    right_lower_bound = right_aligment_dict['lower_bound']
-    right_upper_bound = right_aligment_dict['upper_bound']
-    range_with_mid_paragraph_lines = right_upper_bound - right_lower_bound
-    variance = right_aligment_dict['variance']
-    prev_distance_to_upper_bound = right_upper_bound - prev_line[-1]['x1']
-    prev_distance_to_upper_bound_cost = - (prev_distance_to_upper_bound - range_with_mid_paragraph_lines) / (range_with_mid_paragraph_lines * variance)
-    
-
-    return prev_distance_to_upper_bound_cost * 4 if prev_distance_to_upper_bound_cost > 0 else -(-prev_distance_to_upper_bound_cost) ** 2
-
 # def calculate_right_aligment_cost(curr_line, prev_line, right_aligment_dict):
 #     right_lower_bound = right_aligment_dict['lower_bound']
 #     right_upper_bound = right_aligment_dict['upper_bound']
-#     right_peak = right_aligment_dict['peak_value']
 #     range_with_mid_paragraph_lines = right_upper_bound - right_lower_bound
 #     variance = right_aligment_dict['variance']
-#     prev_distance_to_peak = right_peak - prev_line[-1]['x1']
-#     cost_to_peak = 10 / (max(abs(prev_distance_to_peak), 1) * variance)
-
-#     right_aligment_cost = cost_to_peak if prev_distance_to_peak < 0 else cost_to_peak - prev_distance_to_peak ** 2
+#     prev_distance_to_upper_bound = right_upper_bound - prev_line[-1]['x1']
+#     prev_distance_to_upper_bound_cost = - (prev_distance_to_upper_bound - range_with_mid_paragraph_lines) / (range_with_mid_paragraph_lines * variance)
     
 
-#     return right_aligment_cost
+#     return prev_distance_to_upper_bound_cost * 4 if prev_distance_to_upper_bound_cost > 0 else -(-prev_distance_to_upper_bound_cost) ** 2
+
+def calculate_right_aligment_cost(curr_line, prev_line, right_aligment_dict):
+    right_lower_bound = right_aligment_dict['lower_bound']
+    right_upper_bound = right_aligment_dict['upper_bound']
+    right_peak = right_aligment_dict['peak_value']
+    range_with_mid_paragraph_lines = right_upper_bound - right_lower_bound
+    variance = right_aligment_dict['variance']
+    prev_distance_to_peak = right_peak - prev_line[-1]['x1']
+    cost_to_peak = 2 / (max(abs(prev_distance_to_peak), 1) * variance)
+
+    right_aligment_cost = cost_to_peak if prev_distance_to_peak < 0 else cost_to_peak - (prev_distance_to_peak / 10) ** 2
+    
+
+    return right_aligment_cost
 
 def calculate_vertical_aligment_cost(curr_line, prev_line, vertical_aligment_dict):
     mid_paragraph_dict = vertical_aligment_dict['mid_paragraph_spacing']
@@ -258,9 +258,9 @@ def calculate_vertical_aligment_cost(curr_line, prev_line, vertical_aligment_dic
     outer_paragraph_spacing = outer_paragraph_dict['peak_value']
     range_with_mid_paragraph_lines = outer_paragraph_spacing - mid_paragraph_spacing
 
-    neutral_mid_paragraph_spacing = (mid_paragraph_spacing + outer_paragraph_spacing*3) / 4
+    neutral_mid_paragraph_spacing = (mid_paragraph_spacing + outer_paragraph_spacing*4) / 5
 
-    vertical_aligment_cost = (neutral_mid_paragraph_spacing - bounded_curr_vertical_distance) * 7 / range_with_mid_paragraph_lines
+    vertical_aligment_cost = (neutral_mid_paragraph_spacing - bounded_curr_vertical_distance) * 6 / range_with_mid_paragraph_lines
     
     return vertical_aligment_cost
 
@@ -284,14 +284,14 @@ def is_current_and_previous_lines_in_same_paragraph(curr_line, prev_line, prev2_
     horizontal_distance_cost = 2 if horizontal_distance == 0 else min(horizontal_distance, 0) * (200 / right_aligment_dict['upper_bound'])
     item_level_cost = calculate_item_cost(curr_line[0]['para'])
     # these 2 should only get the value related to curr-prev, and then compare it to the average values of the document, not to only 1 other value
-    vertical_distance_cost = vertical_distance_diff(curr_line, prev_line, prev2_line) * 2
+    # vertical_distance_cost = vertical_distance_diff(curr_line, prev_line, prev2_line) * 2
     # prev_number_of_characters = sum(len(unit['para']) for unit in prev_line)
     # todo: check if current line start with a similar string as the current paragraph
 
     prev_punctuation_cost = -5 if did_prev_end_with_final_puctuation else 5
 
-    total_cost = prev_distance_to_upper_bound_cost + vertical_aligment_cost + prev_punctuation_cost + horizontal_distance_cost + vertical_distance_cost + item_level_cost
-    is_same_paragraph = (prev_distance_to_upper_bound_cost + vertical_aligment_cost + prev_punctuation_cost + horizontal_distance_cost + vertical_distance_cost + item_level_cost) > 0
+    total_cost = prev_distance_to_upper_bound_cost + vertical_aligment_cost + prev_punctuation_cost + horizontal_distance_cost + item_level_cost
+    is_same_paragraph = total_cost > 0
     return is_same_paragraph
 
 
