@@ -2,7 +2,7 @@ import os
 import fitz  # PyMuPDF
 from difflib import SequenceMatcher
 import re
-from pre_processing.functions import calculate_right_aligment, group_lines_into_paragraphs, group_units_in_lines
+from pre_processing.functions import group_lines_into_paragraphs, group_units_in_lines
 
 # Target percentage of data
 target_percentage = 0.4
@@ -71,6 +71,7 @@ def get_content_without_headers_and_footers(path):
     doc_length = len(doc)
     sorted_header_units = []
     sorted_footer_units = []
+    all_page_widths = []
     units = []
     unit_count = 0
     
@@ -78,6 +79,7 @@ def get_content_without_headers_and_footers(path):
         page = doc.load_page(page_nr)
         blocks = page.get_text("dict")["blocks"]
         p_height = page.rect.height
+        all_page_widths.append(page.rect.width)
         page_units = []
 
         for block in blocks:
@@ -142,13 +144,13 @@ def get_content_without_headers_and_footers(path):
         units_in_page_n = [u for u in units if u.get('page') == page_nr]
         pages_without_headers_and_footers.extend([u for u in units_in_page_n if u.get('index') not in header_footer_indexes])
 
+    avg_page_width = sum(all_page_widths) / len(all_page_widths)
     pages_organized_by_lines = group_units_in_lines(pages_without_headers_and_footers, doc_length)
-    right_aligment_dict = calculate_right_aligment(pages_organized_by_lines, target_percentage)
-    all_paragraphs = group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, doc_length)
+    all_paragraphs = group_lines_into_paragraphs(pages_organized_by_lines, target_percentage, doc_length, avg_page_width)
 
     return all_paragraphs
 
-for i in range(2, 26):
+for i in range(1, 26):
     print(f"starting {i}")
     path_to_pdf = f'pdfs/edital{i}.pdf'
     output_file_name = f'pdfs/edital{i}_preprocessed{str(target_percentage)}.txt'

@@ -1,95 +1,134 @@
 import numpy as np
 from scipy.stats import gaussian_kde
+from scipy.signal import find_peaks
 import math
 import matplotlib.pyplot as plt
+import re
 
-def calculate_right_aligment(pages_organized_by_lines, target_percentage):
-    # Replace this with your actual data
-    all_line_ends_x_coord = [line_unit[-1]['x1'] for line_unit in pages_organized_by_lines]
 
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
+
+def find_optimal_bounds(cdf_values, peak_idx, target_percentage):
+    lower_bound_idx = peak_idx
+    upper_bound_idx = peak_idx
+
+    total_data_percentage = 0
+
+    while total_data_percentage < target_percentage and (lower_bound_idx > 0 or upper_bound_idx < len(cdf_values) - 1):
+        if lower_bound_idx > 0:
+            lower_bound_idx -= 1
+        if upper_bound_idx < len(cdf_values) - 1:
+            upper_bound_idx += 1
+
+        total_data_percentage = cdf_values[upper_bound_idx] - cdf_values[lower_bound_idx]
+
+    return lower_bound_idx, upper_bound_idx
+
+def calculate_data_concentration_and_bounds(pages_organized_by_lines, target_percentage, num_peaks, bw_method, feature_list):
     # Calculate the KDE with a smaller bandwidth
-    kde = gaussian_kde(all_line_ends_x_coord, bw_method=0.03)
-    x_range = np.linspace(min(all_line_ends_x_coord), max(all_line_ends_x_coord), 1000)
-    kde_values = kde(x_range)
+    kde = gaussian_kde(feature_list, bw_method=bw_method)
+    feature_range = np.linspace(min(feature_list), max(feature_list), 1000)
+    kde_values = kde(feature_range)
 
-    # Find the peak of the KDE
-    peak_x_coord = x_range[np.argmax(kde_values)]
+    # Find all peaks of the KDE
+    peaks, _ = find_peaks(kde_values, height=np.max(kde_values) * 0.1)  # You can adjust the 'height' parameter as needed
+    peak_values = feature_range[peaks]
+
+    # Sort the peaks by their KDE value in descending order and select the top num_peaks peaks
+    sorted_peaks = sorted(peaks, key=lambda idx: kde_values[idx], reverse=True)[:num_peaks]
+    selected_peak_features = feature_range[sorted_peaks]
+
+    results = []
 
     # Calculate the CDF of the KDE
     cdf_values = np.cumsum(kde_values)
     cdf_values /= cdf_values[-1]  # Normalize to make it a proper CDF
 
-    # Function to find nearest value index in array
-    def find_nearest(array, value):
-        idx = (np.abs(array - value)).argmin()
-        return idx
+    for peak_value in selected_peak_features:
+        # Find the index of the peak in feature
+        peak_idx = find_nearest(feature_range, peak_value)
 
-    # Find index of the peak in x_range
-    peak_idx = find_nearest(x_range, peak_x_coord)
+        # Find the optimal bounds
+        lower_bound_idx, upper_bound_idx = find_optimal_bounds(cdf_values, peak_idx, target_percentage)
 
-    # Initialize bounds
-    lower_bound_idx = peak_idx
-    upper_bound_idx = peak_idx
+        # Get the actual feature for these indices
+        lower_bound = feature_range[lower_bound_idx]
+        upper_bound = feature_range[upper_bound_idx]
 
+        # Calculate the standard deviation of the filtered feature within this interval
+        filtered_value = [v for v in feature_list if lower_bound <= v <= upper_bound]
+        std_deviation = np.std(filtered_value)
+        variance = math.sqrt(std_deviation)
 
-    # Expand bounds to include the target percentage of data
-    def find_optimal_bounds(cdf, peak_idx, target_percentage):
-        n = len(cdf)
-        best_lower = best_upper = peak_idx
-        best_width = float('inf')
-
-        for lower in range(peak_idx, -1, -1):
-            for upper in range(peak_idx, n):
-                if cdf[upper] - cdf[lower] >= target_percentage:
-                    width = upper - lower
-                    if width < best_width:
-                        best_lower, best_upper = lower, upper
-                        best_width = width
-                    break  # Move to the next lower bound
-
-        return best_lower, best_upper
-
-    # Find the optimal bounds
-    lower_bound_idx, upper_bound_idx = find_optimal_bounds(cdf_values, peak_idx, target_percentage)
-
-    # Get the actual X coordinates for these indices
-    lower_bound = x_range[lower_bound_idx]
-    upper_bound = x_range[upper_bound_idx]
-
-    # Calculate the standard deviation of the filtered x_coords within this interval
-    filtered_x_coords = [x for x in all_line_ends_x_coord if lower_bound <= x <= upper_bound]
-    std_deviation = np.std(filtered_x_coords)
-    variance = math.sqrt(std_deviation)
+        results.append({
+            'std_deviation': std_deviation,
+            'variance': variance,
+            'lower_bound': lower_bound,
+            'peak_value': peak_value,
+            'upper_bound': upper_bound,
+        })
 
     # # Plot histogram and KDE with the bounds
     # plt.figure(figsize=(10, 6))
-    # plt.hist(all_line_ends_x_coord, bins=50, color='blue', alpha=0.7, label='ends X Coord', density=True)
-    # plt.plot(x_range, kde_values, color='red', label='KDE')
-    # plt.axvline(peak_x_coord, color='green', linestyle='--', label=f'Peak: {peak_x_coord:.2f}')
-    # plt.axvline(lower_bound, color='purple', linestyle='--', label=f'Lower Bound: {lower_bound:.2f}')
-    # plt.axvline(upper_bound, color='orange', linestyle='--', label=f'Upper Bound: {upper_bound:.2f}')
-    # plt.xlabel('X Coordinate')
+    # plt.hist(feature_list, bins=50, color='blue', alpha=0.7, label='ends feature', density=True)
+    # plt.plot(feature_range, kde_values, color='red', label='KDE')
+    
+    # for result in results:
+    #     plt.axvline(result['peak_value'], color='green', linestyle='--', label=f'Peak: {result["peak_value"]:.2f}')
+    #     plt.axvline(result['lower_bound'], color='purple', linestyle='--', label=f'Lower Bound: {result["lower_bound"]:.2f}')
+    #     plt.axvline(result['upper_bound'], color='orange', linestyle='--', label=f'Upper Bound: {result["upper_bound"]:.2f}')
+    
+    # plt.xlabel('feature')
     # plt.ylabel('Density')
-    # plt.title(f'Histogram and KDE of X Coordinates with 10% Data Interval')
+    # plt.title(f'Histogram and KDE of feature with {target_percentage*100:.0f}% Data Interval')
     # plt.legend()
     # plt.grid(True)
     # plt.show()
 
-    print('std_deviation: ', std_deviation)
-    print('variance: ', variance)
-    print('lower_bound: ', lower_bound)
-    print('peak_x_coord: ', peak_x_coord)
-    print('upper_bound: ', upper_bound)
-    print('target_percentage: ', target_percentage)
+    for i, result in enumerate(results, 1):
+        print(f"Peak {i} results:")
+        print('std_deviation: ', result['std_deviation'])
+        print('variance: ', result['variance'])
+        print('lower_bound: ', result['lower_bound'])
+        print('peak_value: ', result['peak_value'])
+        print('upper_bound: ', result['upper_bound'])
+        print('target_percentage: ', target_percentage)
+        print()
 
-    return {
-        'std_deviation': std_deviation,
-        'variance': variance,
-        'lower_bound': lower_bound,
-        'peak_x_coord': peak_x_coord,
-        'upper_bound': upper_bound,
+    return results
+
+
+
+def calculate_right_aligment(pages_organized_by_lines, target_percentage, avg_page_width):
+    num_peaks, bw_method = 1, 0.03
+    all_line_ends_x_coord = [line_unit[-1]['x1'] for line_unit in pages_organized_by_lines if line_unit[-1]['x1'] > avg_page_width * 0.6]
+    results = calculate_data_concentration_and_bounds(pages_organized_by_lines, target_percentage, num_peaks, bw_method, all_line_ends_x_coord)
+    return results[0]
+
+def calculate_vertical_alignment(pages_organized_by_lines, target_percentage):
+    num_peaks, bw_method = 2, 0.2
+    all_line_vertical_distances = []
+
+    for i in range(len(pages_organized_by_lines) - 1):
+        prev_line = pages_organized_by_lines[i]
+        curr_line = pages_organized_by_lines[i + 1]
+        feature_diff = curr_line[-1]['origin_y0'] - prev_line[-1]['origin_y0']
+        
+        if feature_diff < 0 or curr_line[-1]['page'] != prev_line[-1]['page']:
+            continue
+        all_line_vertical_distances.append(feature_diff)
+    
+    results = calculate_data_concentration_and_bounds(pages_organized_by_lines, target_percentage, num_peaks, bw_method, all_line_vertical_distances
+    )
+
+    formatted_results = {
+        'mid_paragraph_spacing': min(results, key=lambda x: x['peak_value']),
+        'outer_paragraph_spacing': max(results, key=lambda x: x['peak_value']),
     }
-
+    return formatted_results
 
 def group_units_in_lines(pages_without_headers_and_footers, doc_length):
     # Organize the content into paragraphs
@@ -142,17 +181,96 @@ def vertical_distance_diff(curr_line, prev_line, prev2_line):
     distance_difference = prev_prev2_distance - curr_prev_distance
 
     return distance_difference
+
+def is_roman_number(num):
+    pattern = re.compile(r"""   
+                                ^M{0,3}            # Thousands - 0 to 3000
+                                (CM|CD|D?C{0,3})   # Hundreds - 900 (CM), 400 (CD), 0-300 (0-3 Cs), or 500-800 (D followed by 0-3 Cs)
+                                (XC|XL|L?X{0,3})   # Tens - 90 (XC), 40 (XL), 0-30 (0-3 Xs), or 50-80 (L followed by 0-3 Xs)
+                                (IX|IV|V?I{0,3})   # Units - 9 (IX), 4 (IV), 0-3 (0-3 Is), or 5-8 (V followed by 0-3 Is)
+                                $""", re.VERBOSE | re.IGNORECASE)  # End of string, case insensitive
+    return bool(re.match(pattern, num))
+
+def get_items_and_separators(s):
+    # Split the string by the first space and take the first group
+    first_group = s.split(' ')[0]
+    # Get the list of all separators in first_group
+    separators = re.findall(r'[^0-9A-Za-z+*]', first_group)
+
+    # Split the first group into segments using the specified separators
+    segments = re.split(r'[^0-9A-Za-z+*]', first_group)
+    item_level = 0
+
+    for i, segment in enumerate(segments):
+        if segment and (segment.isdigit() or (segment.isalpha() and len(segment) == 1) or is_roman_number(segment)):
+            # Check if it's the last segment and if it's immediately followed by a separator
+            if i + 1 < len(segments):
+                item_level += 1
+            elif i + 1 == len(segments) and len(first_group) > sum(map(len, segments)) + len(separators):
+                item_level += 1
     
-def is_current_and_previous_lines_in_same_paragraph(curr_line, prev_line, prev2_line, right_aligment_dict):
+    return item_level, separators
+
+def calculate_item_cost(s):
+    item_level, separators = get_items_and_separators(s)
+    if all([separator in ['.', '-', ')'] for separator in separators]):
+        return - item_level * 4
+    else:
+        return - item_level * 2
+
+def calculate_right_aligment_cost(curr_line, prev_line, right_aligment_dict):
+    right_lower_bound = right_aligment_dict['lower_bound']
+    right_upper_bound = right_aligment_dict['upper_bound']
+    range_with_mid_paragraph_lines = right_upper_bound - right_lower_bound
+    variance = right_aligment_dict['variance']
+    prev_distance_to_upper_bound = right_upper_bound - prev_line[-1]['x1']
+    prev_distance_to_upper_bound_cost = - (prev_distance_to_upper_bound - range_with_mid_paragraph_lines) / (range_with_mid_paragraph_lines * variance)
+    
+
+    return prev_distance_to_upper_bound_cost * 4 if prev_distance_to_upper_bound_cost > 0 else -(-prev_distance_to_upper_bound_cost) ** 2
+
+# def calculate_right_aligment_cost(curr_line, prev_line, right_aligment_dict):
+#     right_lower_bound = right_aligment_dict['lower_bound']
+#     right_upper_bound = right_aligment_dict['upper_bound']
+#     right_peak = right_aligment_dict['peak_value']
+#     range_with_mid_paragraph_lines = right_upper_bound - right_lower_bound
+#     variance = right_aligment_dict['variance']
+#     prev_distance_to_peak = right_peak - prev_line[-1]['x1']
+#     cost_to_peak = 10 / (max(abs(prev_distance_to_peak), 1) * variance)
+
+#     right_aligment_cost = cost_to_peak if prev_distance_to_peak < 0 else cost_to_peak - prev_distance_to_peak ** 2
+    
+
+#     return right_aligment_cost
+
+def calculate_vertical_aligment_cost(curr_line, prev_line, vertical_aligment_dict):
+    mid_paragraph_dict = vertical_aligment_dict['mid_paragraph_spacing']
+    outer_paragraph_dict = vertical_aligment_dict['outer_paragraph_spacing']
+
+    curr_vertical_distance = curr_line[0]['origin_y0'] - prev_line[0]['origin_y0']
+
+    if curr_line[0]['page'] != prev_line[0]['page'] or curr_vertical_distance < 0 or mid_paragraph_dict['peak_value'] == outer_paragraph_dict['peak_value']:
+        return 0
+
+    bounded_curr_vertical_distance = max(mid_paragraph_dict['lower_bound'], min(curr_vertical_distance, outer_paragraph_dict['upper_bound']))
+    
+    mid_paragraph_spacing = mid_paragraph_dict['peak_value']
+    outer_paragraph_spacing = outer_paragraph_dict['peak_value']
+    range_with_mid_paragraph_lines = outer_paragraph_spacing - mid_paragraph_spacing
+
+    neutral_mid_paragraph_spacing = (mid_paragraph_spacing + outer_paragraph_spacing*3) / 4
+
+    vertical_aligment_cost = (neutral_mid_paragraph_spacing - bounded_curr_vertical_distance) * 7 / range_with_mid_paragraph_lines
+    
+    return vertical_aligment_cost
+
+def is_current_and_previous_lines_in_same_paragraph(curr_line, prev_line, prev2_line, right_aligment_dict, vertical_aligment_dict):
     """
         Positive values indicates higher probability of curr and prev being in the same paragraph
     """
-    lower_bound = right_aligment_dict['lower_bound']
-    upper_bound = right_aligment_dict['upper_bound']
-    variance = right_aligment_dict['variance']
-    range_with_mid_paragraph_lines = upper_bound - lower_bound
-    prev_distance_to_upper_bound = upper_bound - prev_line[-1]['x1']
 
+    prev_distance_to_upper_bound_cost = calculate_right_aligment_cost(curr_line, prev_line, right_aligment_dict)
+    vertical_aligment_cost = calculate_vertical_aligment_cost(curr_line, prev_line, vertical_aligment_dict)
     # We multiply by variance because the more concentrated (smaller variance) line endings are to a specific point,
     # the higher the chance of the text being justify, so the distance from the upper_bound matters more
     is_prev_and_curr_perfectly_aligned = prev_line[0]['x0'] == curr_line[0]['x0']
@@ -163,21 +281,25 @@ def is_current_and_previous_lines_in_same_paragraph(curr_line, prev_line, prev2_
     are_colors_equal = prev_line[0]['color'] == curr_line[0]['color']
     are_flags_equal = prev_line[0]['flags'] == curr_line[0]['flags']
     horizontal_distance = curr_line[0]['x0'] - prev_line[0]['x0']
-    horizontal_distance_cost = 5 if horizontal_distance == 0 else min(horizontal_distance, 0) * (200 / upper_bound)
+    horizontal_distance_cost = 2 if horizontal_distance == 0 else min(horizontal_distance, 0) * (200 / right_aligment_dict['upper_bound'])
+    item_level_cost = calculate_item_cost(curr_line[0]['para'])
     # these 2 should only get the value related to curr-prev, and then compare it to the average values of the document, not to only 1 other value
-    vertical_distance_cost = vertical_distance_diff(curr_line, prev_line, prev2_line)
+    vertical_distance_cost = vertical_distance_diff(curr_line, prev_line, prev2_line) * 2
     # prev_number_of_characters = sum(len(unit['para']) for unit in prev_line)
+    # todo: check if current line start with a similar string as the current paragraph
 
-    prev_distance_to_upper_bound_cost = - (prev_distance_to_upper_bound - range_with_mid_paragraph_lines) / (range_with_mid_paragraph_lines * variance)
     prev_punctuation_cost = -5 if did_prev_end_with_final_puctuation else 5
 
-    is_same_paragraph = (prev_distance_to_upper_bound_cost + prev_punctuation_cost + horizontal_distance_cost + vertical_distance_cost) > 0
+    total_cost = prev_distance_to_upper_bound_cost + vertical_aligment_cost + prev_punctuation_cost + horizontal_distance_cost + vertical_distance_cost + item_level_cost
+    is_same_paragraph = (prev_distance_to_upper_bound_cost + vertical_aligment_cost + prev_punctuation_cost + horizontal_distance_cost + vertical_distance_cost + item_level_cost) > 0
     return is_same_paragraph
 
 
-def group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, doc_length):
+def group_lines_into_paragraphs(pages_organized_by_lines, target_percentage, doc_length, avg_page_width):
     all_paragraphs = []
     paragraph = []
+    right_aligment_dict = calculate_right_aligment(pages_organized_by_lines, target_percentage, avg_page_width)
+    vertical_aligment_dict = calculate_vertical_alignment(pages_organized_by_lines, 0.1)
 
     for page_nr in range(1, doc_length + 1):
         for line_index, current_line in enumerate(pages_organized_by_lines):
@@ -193,7 +315,7 @@ def group_lines_into_paragraphs(pages_organized_by_lines, right_aligment_dict, d
 
             previous_line = pages_organized_by_lines[line_index - 1]
             second_previous_line = pages_organized_by_lines[max(line_index - 2, 0)]
-            paragraph_continuation = is_current_and_previous_lines_in_same_paragraph(current_line, previous_line, second_previous_line, right_aligment_dict)
+            paragraph_continuation = is_current_and_previous_lines_in_same_paragraph(current_line, previous_line, second_previous_line, right_aligment_dict, vertical_aligment_dict)
             if not paragraph_continuation:
                 # assert line[0]['page'] == line[-1]['page']
                 all_paragraphs.append(paragraph)
