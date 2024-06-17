@@ -148,24 +148,34 @@ def get_content_without_headers_and_footers(path):
     pages_organized_by_lines = group_units_in_lines(pages_without_headers_and_footers, doc_length)
     all_paragraphs = group_lines_into_paragraphs(pages_organized_by_lines, target_percentage, doc_length, avg_page_width)
 
-    return all_paragraphs
+
+    # Initialize an empty list to hold all the content
+    final_content = []
+
+    # Loop through the data and build the final content string
+    for paragraph in all_paragraphs:
+        for line in paragraph:
+            for unit in line:
+                # Append the combined string to the list
+                final_content.append(unit['para'])
+        # Only break lines after a paragraph ending
+        final_content.append('\n')
+
+    # Join the final content list into a single string
+    final_string = ''.join(final_content)
+
+    return final_string
 
 for i in range(1, 26):
     print(f"starting {i}")
     path_to_pdf = f'pdfs/edital{i}.pdf'
     output_file_name = f'pdfs/edital{i}_preprocessed{str(target_percentage)}.txt'
-    content = get_content_without_headers_and_footers(path_to_pdf)
+    final_string = get_content_without_headers_and_footers(path_to_pdf)
 
     if os.path.exists(output_file_name):
         # Delete the existing file
         os.remove(output_file_name)
 
-    with open(output_file_name, "a", encoding="utf-8") as file:
-        # Loop through the data and append each item to the file
-        for paragraph in content:
-            for line in paragraph:
-                for unit in line:
-                    # Append the combined string to the file
-                    file.write(unit['para'])
-            # Only break lines after a paragraph ending
-            file.write('\n')
+    # Write the final string to the file once
+    with open(output_file_name, "w", encoding="utf-8") as file:
+        file.write(final_string)
